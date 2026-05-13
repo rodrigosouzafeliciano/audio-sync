@@ -354,13 +354,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- Alerta de Erro Crítico Acessível (role="alert" adicionado) -->
-                <div id="error-message" class="hidden absolute top-4 left-1/2 -translate-x-1/2 w-[90%] p-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs sm:text-sm flex items-center justify-center gap-2 backdrop-blur-md z-20 shadow-lg transform-gpu animate-[fadeIn_0.2s_ease-out]" role="alert" aria-live="assertive">
-                    <span class="material-symbols-outlined text-[18px] icon-fill flex-shrink-0" aria-hidden="true">error</span>
-                    <span id="error-text" class="font-medium text-center" data-i18n="errorGeneric">Erro ao processar o link.</span>
-                </div>
-
             </div>
 
             <!-- Seção de Recursos -->
@@ -394,7 +387,7 @@
         
         <footer class="w-full py-6 text-center border-t border-white/5 mt-8">
             <p class="text-[11px] text-slate-500 font-medium">
-                Desenvolvido por <span class="text-[#FF7A21] font-bold">@ Rodrigo Souza Feliciano</span> · 
+                <span data-i18n="footerDev">Desenvolvido por</span> <span class="text-[#FF7A21] font-bold">@ Rodrigo Souza Feliciano</span> · 
                 <span id="footer-year"></span>
             </p>
         </footer>
@@ -427,7 +420,7 @@
                     infoTitle: 'AudioSync — Conversor de mídia YouTube para MP3',
                     infoDesc: 'Plataforma de engenharia de software desenvolvida e mantida por <strong class="text-[#FF7A21]">@ Rodrigo Souza Feliciano</strong>. <br><br>Desenhada com arquitetura de ponta para otimizar a extração e conversão de mídia, garantindo a mais alta fidelidade de áudio com foco extremo em performance, segurança e usabilidade premium.',
                     infoClose: 'Entendido',
-                    errorInvalid: 'Link inválido. Insira uma URL oficial do YouTube.',
+                    errorInvalid: '⚠️ Link inválido. Insira uma URL oficial do YouTube.',
                     simMsg1: 'Buscando metadados do vídeo...',
                     simMsg2: 'Isolando faixa de áudio original...',
                     simMsg3: 'Convertendo para MP3 (320kbps)...',
@@ -442,8 +435,9 @@
                     ariaInfo: 'Informações do Sistema',
                     ariaSocial: 'Redes Sociais',
                     ariaClose: 'Fechar informações',
-                    errorGeneric: 'Erro ao processar o link.',
-                    valEmpty: 'Por favor, preencha este campo com o link do vídeo.',
+                    errorGeneric: '⚠️ Erro ao processar o link.',
+                    valEmpty: '⚠️ Insira um URL.',
+                    footerDev: 'Desenvolvido por',
                     fileNameText: 'Áudio Convertido.mp3',
                     fileNameTitle: 'Áudio Convertido.mp3',
                     flag: '🇧🇷'
@@ -468,7 +462,7 @@
                     infoTitle: 'AudioSync — YouTube to MP3 Media Converter',
                     infoDesc: 'Software engineering platform developed and maintained by <strong class="text-[#FF7A21]">@ Rodrigo Souza Feliciano</strong>. <br><br>Designed with cutting-edge architecture to optimize media extraction and conversion, ensuring the highest audio fidelity with an extreme focus on performance, security, and premium usability.',
                     infoClose: 'Understood',
-                    errorInvalid: 'Invalid link. Please enter an official YouTube URL.',
+                    errorInvalid: '⚠️ Invalid link. Please enter an official YouTube URL.',
                     simMsg1: 'Fetching video metadata...',
                     simMsg2: 'Isolating original audio track...',
                     simMsg3: 'Converting to MP3 (320kbps)...',
@@ -483,8 +477,9 @@
                     ariaInfo: 'System Information',
                     ariaSocial: 'Social Networks',
                     ariaClose: 'Close information',
-                    errorGeneric: 'Error processing the link.',
-                    valEmpty: 'Please fill out this field with the video link.',
+                    errorGeneric: '⚠️ Error processing the link.',
+                    valEmpty: '⚠️ Please insert a URL.',
+                    footerDev: 'Developed by',
                     fileNameText: 'Converted Audio.mp3',
                     fileNameTitle: 'Converted Audio.mp3',
                     flag: '🇺🇸'
@@ -626,8 +621,6 @@
             
             const processingState = document.getElementById('processing-state');
             const successState = document.getElementById('success-state');
-            const errorContainer = document.getElementById('error-message');
-            const errorText = document.getElementById('error-text');
             
             const statusText = document.getElementById('status-text');
             const progressText = document.getElementById('progress-text');
@@ -658,6 +651,7 @@
             }
 
             urlInput.addEventListener('input', () => {
+                urlInput.setCustomValidity('');
                 btnClearInput.classList.toggle('hidden', urlInput.value.length === 0);
             });
 
@@ -699,7 +693,6 @@
                 const url = urlInput.value.trim();
                 
                 if(errorTimeout) clearTimeout(errorTimeout);
-                errorContainer.classList.add('hidden');
                 mainPanel.classList.remove('animate-[shake_0.4s_ease-in-out]');
 
                 if (!url) {
@@ -789,10 +782,9 @@
             });
 
             function showError(msgKey) {
-                errorText.setAttribute('data-i18n', msgKey);
-                errorText.textContent = translations[currentLang][msgKey];
+                urlInput.setCustomValidity(translations[currentLang][msgKey]);
+                urlInput.reportValidity();
                 
-                errorContainer.classList.remove('hidden');
                 mainPanel.classList.remove('animate-[shake_0.4s_ease-in-out]');
                 void mainPanel.offsetWidth; 
                 mainPanel.classList.add('animate-[shake_0.4s_ease-in-out]');
@@ -800,8 +792,8 @@
                 mainPanel.style.borderColor = 'rgba(244, 63, 94, 0.4)';
                 mainPanel.style.boxShadow = '0 0 30px rgba(244, 63, 94, 0.15)';
                 
+                if(errorTimeout) clearTimeout(errorTimeout);
                 errorTimeout = setTimeout(() => {
-                    errorContainer.classList.add('hidden');
                     mainPanel.style.borderColor = '';
                     mainPanel.style.boxShadow = '';
                 }, 4000);
@@ -848,9 +840,9 @@
 
                 mainPanel.classList.remove('active-glow');
                 if(errorTimeout) clearTimeout(errorTimeout);
-                errorContainer.classList.add('hidden');
                 mainPanel.style.borderColor = '';
                 mainPanel.style.boxShadow = '';
+                urlInput.setCustomValidity('');
 
                 form.reset();
                 urlInput.value = '';
