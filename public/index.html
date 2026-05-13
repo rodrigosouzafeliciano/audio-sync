@@ -718,7 +718,7 @@
                 resetUI();
             });
 
-            btnDownload.addEventListener('click', () => {
+            btnDownload.addEventListener('click', async () => {
                 if (btnDownload.disabled || !dadosDownload.url) return;
 
                 btnDownload.disabled = true;
@@ -735,21 +735,32 @@
                 btnDownload.classList.replace('shadow-[0_8px_20px_-5px_rgba(16,185,129,0.4)]', 'shadow-none');
                 btnDownload.classList.replace('border-emerald-400/20', 'border-slate-500/50');
 
-                // Usa o /api/stream como proxy redirect: garante nome correto do arquivo
-                // e evita problemas de CORS ao acessar a URL da API diretamente
-                const filename = encodeURIComponent((dadosDownload.titulo || 'audio') + '.mp3');
-                const streamUrl = '/api/stream?url=' + encodeURIComponent(dadosDownload.url) + '&title=' + encodeURIComponent(dadosDownload.titulo || 'audio');
+                // Baixa via fetch → Blob → Object URL com nome correto
+                // Evita redirect que perde o Content-Disposition e corrompre o nome do arquivo
+                const nomeArquivo = (dadosDownload.titulo || 'audio') + '.mp3';
                 
-                const a = document.createElement('a');
-                a.href = streamUrl;
-                a.download = (dadosDownload.titulo || 'audio') + '.mp3';
-                a.style.display = 'none';
-                
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup
-                setTimeout(() => document.body.removeChild(a), 100);
+                try {
+                    const respBlob = await fetch('/api/stream?url=' + encodeURIComponent(dadosDownload.url) + '&title=' + encodeURIComponent(dadosDownload.titulo || 'audio'));
+                    const blob = await respBlob.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = nomeArquivo;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl);
+                        document.body.removeChild(a);
+                    }, 1000);
+                } catch (errBlob) {
+                    console.error('Erro ao baixar blob:', errBlob);
+                    // Fallback: abre direto no browser
+                    window.open(dadosDownload.url, '_blank');
+                }
 
                 // Feedback visual — conclusão
                 const t1 = setTimeout(() => {

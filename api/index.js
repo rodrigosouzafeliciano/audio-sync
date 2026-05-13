@@ -1,18 +1,20 @@
 /**
  * AudioSync — Conversor de mídia YouTube para MP3
  *
- * CORREÇÃO VERCEL HOBBY: O plano Hobby tem limite de 4.5MB no body da resposta,
- * o que quebra o streaming via pipe(). Solução: /api/stream agora faz um
- * redirect 302 direto para a URL do MP3, deixando o browser baixar diretamente.
+ * SOLUÇÃO DEFINITIVA PARA VERCEL HOBBY:
+ * /api/stream usa https nativo do Node para fazer proxy do MP3,
+ * setando Content-Disposition com o nome correto ANTES de stremar.
  *
  * Endpoints:
  *   POST /api/start   → Chama a API, retorna o link de download pronto
- *   GET  /api/stream  → Redirect 302 para a URL real do MP3 (download direto)
+ *   GET  /api/stream  → Proxy do MP3 com Content-Disposition correto
  *   GET  /api/health  → Health check
  */
 
 const express = require('express');
 const axios   = require('axios');
+const https   = require('https');
+const http    = require('http');
 const path    = require('path');
 require('dotenv').config();
 
@@ -21,8 +23,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// ── Configuração ────────────────────────────────────────────
 
 const API_HOST = process.env.API_HOST || 'youtube-mp36.p.rapidapi.com';
 const API_URL  = process.env.API_URL  || 'https://youtube-mp36.p.rapidapi.com/dl';
@@ -33,63 +33,37 @@ const apiKeys = (process.env.API_KEYS || '')
   .filter(Boolean);
 
 if (apiKeys.length === 0) {
-  console.error('⛔ ERRO FATAL: Variável API_KEYS não definida ou vazia.');
+  console.error('ERRO FATAL: API_KEYS nao definida.');
 }
 
-console.log(`🔑 ${apiKeys.length} chave(s) de API carregada(s)`);
-console.log(`🌐 Host: ${API_HOST}`);
-
-// ── Constantes ──────────────────────────────────────────────
+console.log(`${apiKeys.length} chave(s) carregada(s) | Host: ${API_HOST}`);
 
 const TIMEOUT_REQUEST  = 35_000;
 const FILENAME_MAX_LEN = 100;
-
 const REGEX_VIDEO_ID = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/|v\/)|youtu\.be\/)([0-9A-Za-z_-]{11})/;
 
-// ── Rotação de Chaves ───────────────────────────────────────
-
 async function fetchWithRotation(config) {
-  if (apiKeys.length === 0) {
-    throw new Error('Nenhuma chave de API configurada.');
-  }
-
+  if (apiKeys.length === 0) throw new Error('Nenhuma chave de API configurada.');
   let lastError;
-
   for (let i = 0; i < apiKeys.length; i++) {
     const key = apiKeys[i];
-
     try {
       const response = await axios({
         ...config,
-        headers: {
-          ...(config.headers || {}),
-          'x-rapidapi-key':  key,
-          'x-rapidapi-host': API_HOST,
-        },
+        headers: { ...(config.headers || {}), 'x-rapidapi-key': key, 'x-rapidapi-host': API_HOST },
         timeout: TIMEOUT_REQUEST,
       });
-
-      console.log(`   ✅ Key ${i + 1}/${apiKeys.length} OK`);
+      console.log(`   OK Key ${i + 1}`);
       return response;
     } catch (error) {
       lastError = error;
       const status = error.response?.status;
-
-      if (status === 429 || status === 403) {
-        console.warn(`   ⚠️ Key ${i + 1} → ${status}. Rotacionando...`);
-        continue;
-      }
-
-      console.error(`   ❌ Key ${i + 1} → ${status}: ${error.message}`);
+      if (status === 429 || status === 403) { console.warn(`   Key ${i + 1} -> ${status}`); continue; }
       throw error;
     }
   }
-
-  console.error('   ❌ Todas as keys esgotadas.');
   throw lastError;
 }
-
-// ── Utilitários ─────────────────────────────────────────────
 
 function extractVideoId(url) {
   const match = url.trim().match(REGEX_VIDEO_ID);
@@ -97,163 +71,138 @@ function extractVideoId(url) {
 }
 
 function sanitizeFilename(raw) {
-  return (
-    (raw || 'audio')
-      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/_{2,}/g, '_')
-      .substring(0, FILENAME_MAX_LEN)
-      .trim() || 'audio'
-  );
+  return ((raw || 'audio').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, '_').replace(/_{2,}/g, '_').substring(0, FILENAME_MAX_LEN).trim() || 'audio');
 }
 
-// ── POST /api/start ─────────────────────────────────────────
+// Proxy nativo: segue redirects e repassa o MP3 chunk a chunk com nome correto
+function proxyDownload(downloadUrl, filename, res, depth) {
+  depth = depth || 0;
+  if (depth > 5) return Promise.reject(new Error('Muitos redirects'));
 
-app.post('/api/start', async (req, res) => {
-  console.log('\n📥 POST /api/start');
+  return new Promise((resolve, reject) => {
+    const protocol = downloadUrl.startsWith('https') ? https : http;
 
-  try {
-    const { url } = req.body;
+    const req = protocol.get(downloadUrl, {
+      timeout: 60000,
+      headers: { 'User-Agent': 'Mozilla/5.0 AudioSync/1.0' }
+    }, (remoteRes) => {
 
-    if (!url || typeof url !== 'string' || !url.trim()) {
-      return res.status(400).json({ error: 'URL não fornecida.' });
-    }
+      // Seguir redirects manualmente
+      if ([301, 302, 307, 308].includes(remoteRes.statusCode)) {
+        const location = remoteRes.headers['location'];
+        remoteRes.resume();
+        if (location) {
+          console.log(`   Redirect ${remoteRes.statusCode} -> ${location.substring(0, 60)}`);
+          proxyDownload(location, filename, res, depth + 1).then(resolve).catch(reject);
+        } else {
+          reject(new Error('Redirect sem Location header'));
+        }
+        return;
+      }
 
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-      return res.status(400).json({ error: 'URL do YouTube inválida.' });
-    }
+      if (remoteRes.statusCode !== 200) {
+        remoteRes.resume();
+        reject(new Error(`HTTP ${remoteRes.statusCode}`));
+        return;
+      }
 
-    console.log(`   Video ID: ${videoId}`);
+      // Headers com nome correto ANTES de stremar
+      const ascii = filename.replace(/[^\x20-\x7E]/g, '') || 'audio';
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', `attachment; filename="${ascii}.mp3"; filename*=UTF-8''${encodeURIComponent(filename)}.mp3`);
+      res.setHeader('Cache-Control', 'no-cache');
+      if (remoteRes.headers['content-length']) {
+        res.setHeader('Content-Length', remoteRes.headers['content-length']);
+      }
 
-    const { data } = await fetchWithRotation({
-      method: 'GET',
-      url:    API_URL,
-      params: { id: videoId },
+      remoteRes.pipe(res);
+      remoteRes.on('end', resolve);
+      remoteRes.on('error', reject);
     });
 
-    console.log(`   Resposta da API: status=${data?.status} | msg=${data?.msg} | progress=${data?.progress}`);
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+// POST /api/start
+app.post('/api/start', async (req, res) => {
+  console.log('\nPOST /api/start');
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string' || !url.trim()) return res.status(400).json({ error: 'URL nao fornecida.' });
+
+    const videoId = extractVideoId(url);
+    if (!videoId) return res.status(400).json({ error: 'URL do YouTube invalida.' });
+    console.log(`   Video ID: ${videoId}`);
+
+    const { data } = await fetchWithRotation({ method: 'GET', url: API_URL, params: { id: videoId } });
+    console.log(`   API: status=${data?.status} msg=${data?.msg}`);
 
     if (data?.msg === 'fail' || data?.status === 'fail') {
-      console.error('   ❌ API retornou falha:', JSON.stringify(data));
-      return res.status(422).json({
-        error: 'Não foi possível converter este vídeo. Pode ser privado, bloqueado ou muito longo.'
-      });
+      return res.status(422).json({ error: 'Nao foi possivel converter este video.' });
     }
 
     const downloadLink = data?.link || data?.url || null;
+    if (!downloadLink) return res.status(500).json({ error: 'API nao retornou link de download.' });
 
-    if (!downloadLink) {
-      console.error('   ❌ API não retornou link de download:', JSON.stringify(data));
-      return res.status(500).json({
-        error: 'A API não retornou o link de download. Tente novamente em alguns instantes.'
-      });
-    }
-
-    console.log(`   ✅ Link obtido | Título: ${data.title}`);
-
-    return res.json({
-      success:     true,
-      downloadUrl: downloadLink,
-      title:       data.title || 'Audio',
-      filesize:    data.filesize || 0,
-      duration:    Math.round(data.duration || 0),
-    });
+    console.log(`   Link obtido: ${data.title}`);
+    return res.json({ success: true, downloadUrl: downloadLink, title: data.title || 'Audio', filesize: data.filesize || 0, duration: Math.round(data.duration || 0) });
 
   } catch (error) {
-    const status  = error.response?.status;
+    const status = error.response?.status;
     const message = error.response?.data?.message || error.message;
-    console.error(`   ❌ /api/start: ${status} — ${message}`);
-
-    if (status === 400) return res.status(400).json({ error: 'Vídeo não encontrado ou URL inválida.' });
-    if (status === 429 || status === 403) return res.status(503).json({ error: 'Limite de requisições atingido. Tente em alguns minutos.' });
-
+    console.error(`   ERRO /api/start: ${status} - ${message}`);
+    if (status === 400) return res.status(400).json({ error: 'Video nao encontrado.' });
+    if (status === 429 || status === 403) return res.status(503).json({ error: 'Limite de requisicoes. Tente em alguns minutos.' });
     return res.status(500).json({ error: `Erro interno: ${message}` });
   }
 });
 
-// ── GET /api/stream ─────────────────────────────────────────
-//
-// CORREÇÃO VERCEL HOBBY: Ao invés de fazer proxy/pipe (que estoura o limite
-// de 4.5MB do Vercel Hobby), fazemos um redirect 302 direto para a URL do MP3.
-// O browser baixa o arquivo diretamente do servidor da API, sem passar pelo Vercel.
-//
-// A URL chega como query param: GET /api/stream?url=https://...&title=Nome
-
-app.get('/api/stream', (req, res) => {
-  console.log('\n📥 GET /api/stream');
-
+// GET /api/stream — proxy real com nome correto
+app.get('/api/stream', async (req, res) => {
+  console.log('\nGET /api/stream');
   const { url: downloadUrl, title } = req.query;
+  if (!downloadUrl) return res.status(400).send('URL nao fornecida.');
 
-  if (!downloadUrl || typeof downloadUrl !== 'string') {
-    return res.status(400).send('URL de download não fornecida.');
-  }
+  const filename = sanitizeFilename(title);
+  console.log(`   Arquivo: ${filename}.mp3`);
 
   try {
-    const filename = sanitizeFilename(title);
-    console.log(`   Redirecionando para download: ${filename}.mp3`);
-
-    // Redirect direto para a URL do MP3
-    // O browser vai baixar o arquivo diretamente, sem passar pelo Vercel
-    return res.redirect(302, downloadUrl);
-
-  } catch (error) {
-    console.error(`   ❌ /api/stream: ${error.message}`);
-    return res.status(500).send('Falha ao redirecionar para o arquivo de áudio.');
+    await proxyDownload(downloadUrl, filename, res, 0);
+  } catch (err) {
+    console.error(`   ERRO stream: ${err.message}`);
+    if (!res.headersSent) res.status(500).send('Falha ao baixar o arquivo.');
   }
 });
 
-// Manter compatibilidade com POST /api/stream (caso o frontend ainda use)
-app.post('/api/stream', (req, res) => {
-  console.log('\n📥 POST /api/stream → redirecionando para GET');
-
+// POST /api/stream (compatibilidade)
+app.post('/api/stream', async (req, res) => {
+  console.log('\nPOST /api/stream');
   const { downloadUrl, title } = req.body;
+  if (!downloadUrl) return res.status(400).send('URL nao fornecida.');
 
-  if (!downloadUrl || typeof downloadUrl !== 'string') {
-    return res.status(400).send('URL de download não fornecida.');
-  }
-
+  const filename = sanitizeFilename(title);
   try {
-    const filename = sanitizeFilename(title);
-    console.log(`   Redirecionando para download: ${filename}.mp3`);
-
-    return res.redirect(302, downloadUrl);
-
-  } catch (error) {
-    console.error(`   ❌ /api/stream POST: ${error.message}`);
-    return res.status(500).send('Falha ao redirecionar para o arquivo de áudio.');
+    await proxyDownload(downloadUrl, filename, res, 0);
+  } catch (err) {
+    console.error(`   ERRO stream POST: ${err.message}`);
+    if (!res.headersSent) res.status(500).send('Falha ao baixar o arquivo.');
   }
 });
 
-// ── GET /api/health ─────────────────────────────────────────
-
+// GET /api/health
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status:    'ok',
-    keys:      apiKeys.length,
-    apiHost:   API_HOST,
-    apiUrl:    API_URL,
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: 'ok', keys: apiKeys.length, timestamp: new Date().toISOString() });
 });
-
-// ── Servidor Local (dev) ────────────────────────────────────
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(express.static(path.join(__dirname, '..', 'public')));
-  app.get('/', (_req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-  });
+  app.get('/', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 }
 
-// ── Bootstrap & Export ──────────────────────────────────────
-
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`\n🚀 http://localhost:${PORT}`);
-    console.log(`🏥 http://localhost:${PORT}/api/health`);
-    console.log(`🔑 ${apiKeys.length} chave(s) ativa(s)`);
-  });
+  app.listen(PORT, () => console.log(`Rodando em http://localhost:${PORT}`));
 }
 
 module.exports = app;
