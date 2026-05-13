@@ -1,3 +1,3 @@
 .env
-node_modules
-new_youtube
+node_modules/
+.vercel/

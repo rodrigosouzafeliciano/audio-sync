@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="theme-color" content="#020617"/>
+    <meta name="description" id="meta-desc" content="AudioSync — Conversor de mídia YouTube para MP3. Extração premium com alta fidelidade de áudio.">
+    <title id="page-title">AudioSync — Conversor de mídia YouTube para MP3</title>
+    
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"></noscript>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    
+    <style>
+        body {
+            opacity: 0;
+            transition: opacity 0.35s ease;
+        }
+        body.is-loaded {
+            opacity: 1;
+        }
+    </style>
+    
+    <!-- Configuração do Tailwind -->
+    <script>
+        window.tailwind = {
+            config: {
+                theme: {
+                    extend: {
+                        keyframes: {
+                            shimmer: { '100%': { transform: 'translateX(100%)' } },
+                            fadeIn: {
+                                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                                '100%': { opacity: '1', transform: 'translateY(0)' }
+                            },
+                            shake: {
+                                '0%, 100%': { transform: 'translateX(0)' },
+                                '20%, 60%': { transform: 'translateX(-6px)' },
+                                '40%, 80%': { transform: 'translateX(6px)' }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <style type="text/tailwindcss">
+        :root {
+            --primary: #FF7A21; 
+            --secondary: #7C3AED; 
+            --bg-canvas: #020617; 
+            --text-main: #F8FAFC;
+            --text-light: #94A3B8;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-canvas);
+            background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 80%);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            /* Proteção para Mobile Viewport (Safari/Chrome Mobile) */
+            min-height: 100vh;
+            min-height: 100dvh; 
+        }
+
+        /* Efeitos de Vidro (Glassmorphism) */
+        .glass-nav {
+            background: rgba(2, 6, 23, 0.3);
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .coin-card {
+            background: rgba(15, 23, 42, 0.15);
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            border: 1px solid rgba(255, 255, 255, 0.03)!important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .coin-card.active-glow {
+            border-color: rgba(255, 255, 255, 0.1)!important;
+            box-shadow: 0 0 30px rgba(255, 122, 33, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+            background: rgba(30, 41, 59, 0.4);
+        }
+
+        @media (hover: hover) {
+            .coin-card:hover {
+                border-color: rgba(255, 255, 255, 0.1)!important;
+                box-shadow: 0 0 30px rgba(255, 122, 33, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+                background: rgba(30, 41, 59, 0.4);
+            }
+            .hover-card-icon:hover, .group:hover .hover-card-icon {
+                background-color: var(--primary);
+                color: white;
+            }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .anim-title    { animation: slideUp 0.5s ease both; animation-delay: 0.1s; }
+        .anim-panel    { animation: slideUp 0.5s ease both; animation-delay: 0.25s; }
+        .anim-card-1   { animation: slideUp 0.5s ease both; animation-delay: 0.4s; }
+        .anim-card-2   { animation: slideUp 0.5s ease both; animation-delay: 0.5s; }
+        .anim-card-3   { animation: slideUp 0.5s ease both; animation-delay: 0.6s; }
+
+        /* Customização da Barra de Rolagem */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-canvas); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        /* Estilização de Ícones preenchidos */
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+
+        /* Animações Personalizadas */
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(0.95); }
+        }
+        .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        
+        /* Acessibilidade Crítica Médica: Redução de Movimento (Proteção contra enjoo/epilepsia) */
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        /* Botões Base */
+        .btn-primary {
+            background: var(--primary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(255, 122, 33, 0.4)!important;
+        }
+        .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; box-shadow: none!important; }
+        
+        .progress-bar-fill { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="flex flex-col relative overflow-x-hidden selection:bg-[#FF7A21]/30 selection:text-white">
+
+    <!-- Modal de Informações (Acessibilidade Refatorada) -->
+    <div id="info-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 transition-opacity duration-300 opacity-0 transform-gpu" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="coin-card p-8 md:p-10 rounded-[2.5rem] w-full max-w-md relative border border-slate-700/50 shadow-2xl transform scale-95 transition-all duration-300 will-change-[transform,opacity]" id="info-modal-content" style="will-change: transform, opacity;">
+            <div class="flex justify-between items-start mb-6">
+                <div class="w-14 h-14 bg-[#FF7A21]/10 rounded-2xl flex items-center justify-center text-[#FF7A21] border border-[#FF7A21]/20">
+                    <span class="material-symbols-outlined text-[28px] icon-fill" aria-hidden="true">verified_user</span>
+                </div>
+                <button id="btn-close-info" class="text-slate-400 hover:text-white transition-colors outline-none focus:ring-2 focus:ring-[#FF7A21] rounded-lg" data-i18n-aria="ariaClose" aria-label="Fechar informações">
+                    <span class="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
+                </button>
+            </div>
+            
+            <h3 id="modal-title" class="text-2xl font-black text-slate-100 tracking-tight mb-3" data-i18n="infoTitle">Sobre o Sistema</h3>
+            
+            <p class="text-slate-300 text-sm leading-relaxed mb-6 font-medium" data-i18n-html="infoDesc">
+                Plataforma de engenharia de software desenvolvida e mantida por <strong class="text-[#FF7A21]">@ Rodrigo Souza Feliciano</strong>. <br><br>
+                Desenhada com arquitetura de ponta para otimizar a extração e conversão de mídia, garantindo a mais alta fidelidade de áudio com foco extremo em performance, segurança e usabilidade premium.
+            </p>
+            
+            <button id="btn-close-info-bottom" class="btn-primary w-full py-3.5 rounded-2xl text-white font-extrabold uppercase tracking-widest text-sm transition-all active:scale-95 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-[#FF7A21]" data-i18n="infoClose">
+                Entendido
+            </button>
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal Protegido -->
+    <div id="app-wrapper" class="flex flex-col flex-grow w-full">
+        
+        <!-- Navegação (Header) -->
+        <header class="sticky top-0 z-50 glass-nav transition-all duration-300">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+                <a href="/" class="flex items-center gap-2.5" aria-label="AudioSync — Conversor de mídia YouTube para MP3">
+                    <div class="w-9 h-9 bg-[var(--primary)] rounded-xl flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,122,33,0.4)]" aria-hidden="true">
+                        <span class="material-symbols-outlined text-[20px] icon-fill">smart_display</span>
+                    </div>
+                    <span class="font-extrabold text-base tracking-tight text-slate-100" aria-hidden="true">Audio<span class="text-[var(--primary)]">Sync</span></span>
+                </a>
+                
+                <div class="flex items-center gap-1.5 md:gap-2 shrink-0">
+                    <!-- Seletor de Idioma -->
+                    <button id="btn-lang" class="w-9 h-9 flex items-center justify-center text-[var(--text-light)] hover:bg-slate-800 rounded-xl transition-all text-[22px] outline-none focus:ring-2 focus:ring-[#FF7A21]" data-i18n-aria="tooltipLang" data-i18n-title="tooltipLang" aria-label="Alterar Idioma" title="Mudar Idioma">
+                        🇧🇷
+                    </button>
+
+                    <!-- Informações -->
+                    <button id="btn-info" class="w-9 h-9 flex items-center justify-center text-[var(--text-light)] hover:text-[var(--primary)] hover:bg-slate-800 rounded-xl transition-all outline-none focus:ring-2 focus:ring-[#FF7A21]" data-i18n-aria="ariaInfo" data-i18n-title="tooltipInfo" aria-label="Informações do Sistema" title="Informações">
+                        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">info</span>
+                    </button>
+
+                    <!-- Menu Social (Dropdown) -->
+                    <div class="relative">
+                        <button id="btn-social" class="w-9 h-9 flex items-center justify-center text-[var(--text-light)] hover:text-[var(--primary)] hover:bg-slate-800 rounded-xl transition-all outline-none focus:ring-2 focus:ring-[#FF7A21]" aria-haspopup="true" aria-expanded="false" data-i18n-aria="ariaSocial" data-i18n-title="tooltipSocial" aria-label="Redes Sociais" title="Minhas Redes Sociais">
+                            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">person</span>
+                        </button>
+                        
+                        <div id="social-menu" class="absolute right-0 top-full mt-2 w-48 bg-slate-900/95 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)] z-50 flex-col gap-1 origin-top-right transition-all transform-gpu" style="display: none;">
+                            <a href="https://www.linkedin.com/in/rodrigosouzafeliciano/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-2.5 hover:bg-slate-800 rounded-xl transition-all text-left group outline-none focus:bg-slate-800">
+                                <span class="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-[#FF7A21] transition-colors" aria-hidden="true">business_center</span>
+                                <span class="text-[12px] font-bold text-slate-300 group-hover:text-[#FF7A21] transition-colors">LinkedIn</span>
+                            </a>
+                            <a href="https://github.com/rodrigosouzafeliciano" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-2.5 hover:bg-slate-800 rounded-xl transition-all text-left group outline-none focus:bg-slate-800">
+                                <span class="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-[#FF7A21] transition-colors" aria-hidden="true">code</span>
+                                <span class="text-[12px] font-bold text-slate-300 group-hover:text-[#FF7A21] transition-colors">GitHub</span>
+                            </a>
+                            <a href="https://www.instagram.com/rodrigo.souza.feliciano/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-2.5 hover:bg-slate-800 rounded-xl transition-all text-left group outline-none focus:bg-slate-800">
+                                <span class="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-[#FF7A21] transition-colors" aria-hidden="true">photo_camera</span>
+                                <span class="text-[12px] font-bold text-slate-300 group-hover:text-[#FF7A21] transition-colors">Instagram</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 md:py-20 pb-8 relative z-10 flex flex-col items-center">
+            
+            <!-- Background Brilhante -->
+            <div class="absolute top-10 left-1/2 -translate-x-1/2 w-72 h-72 bg-[#FF7A21] rounded-full blur-[150px] opacity-15 -z-10 pointer-events-none"></div>
+
+            <!-- Título -->
+            <div class="text-center mb-10 w-full anim-title">
+                <span class="text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.4em] text-[#FF7A21] mb-3 block" data-i18n="subtitle">Extração de Alta Fidelidade</span>
+                <h1 class="text-5xl sm:text-6xl md:text-7xl font-black text-slate-100 tracking-tighter flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+                    <span data-i18n="titlePrefix">YouTube p/</span>
+                    <span class="text-[var(--primary)] bg-slate-900/50 px-4 py-1 rounded-2xl border border-[#FF7A21]/30" data-i18n="titleSuffix">MP3</span>
+                </h1>
+            </div>
+
+            <!-- Painel Central -->
+            <div class="coin-card p-6 sm:p-10 rounded-[2.5rem] sm:rounded-[3.5rem] w-full max-w-2xl relative transition-all duration-500 overflow-hidden transform-gpu anim-panel" id="main-panel">
+                
+                <!-- ESTADO 1: FORMULÁRIO -->
+                <form id="converter-form" novalidate class="flex flex-col relative z-10 w-full animate-[fadeIn_0.3s_ease-out]">
+                    <div class="relative w-full mb-6 group">
+                        <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none transition-colors group-focus-within:text-[#FF7A21] text-slate-500">
+                            <span class="material-symbols-outlined text-[24px]" aria-hidden="true">link</span>
+                        </div>
+                        <input 
+                            type="text" 
+                            inputmode="url"
+                            id="youtube-url" 
+                            placeholder="Cole o link do vídeo aqui..." 
+                            data-i18n-placeholder="placeholder"
+                            autocomplete="url"
+                            spellcheck="false"
+                            autocapitalize="none"
+                            autocorrect="off"
+                            class="w-full bg-slate-900/60 border border-slate-700/50 focus:border-[#FF7A21]/60 focus:ring-1 focus:ring-[#FF7A21]/60 rounded-[2rem] py-5 sm:py-6 pl-16 pr-14 text-white placeholder-slate-500 transition-all outline-none font-medium text-base backdrop-blur-md"
+                        >
+                        <button type="button" id="btn-clear-input" 
+                            class="absolute inset-y-0 right-0 pr-5 flex items-center text-slate-500 hover:text-white transition-colors hidden"
+                            aria-label="Limpar campo">
+                            <span class="material-symbols-outlined text-[20px]">close</span>
+                        </button>
+                    </div>
+                    
+                    <button 
+                        type="submit" 
+                        id="btn-convert"
+                        class="btn-primary w-full py-5 rounded-[2rem] text-white font-extrabold tracking-[0.1em] text-sm sm:text-base uppercase transition-all flex items-center justify-center gap-3 group outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-[#FF7A21]"
+                    >
+                        <span class="material-symbols-outlined group-hover:scale-110 transition-transform icon-fill" aria-hidden="true">headphones</span>
+                        <span data-i18n="btnConvert">Iniciar Conversão</span>
+                    </button>
+                </form>
+
+                <!-- ESTADO 2: PROCESSAMENTO -->
+                <div id="processing-state" class="hidden flex-col items-center justify-center py-6 relative z-10 w-full animate-[fadeIn_0.3s_ease-out]">
+                    
+                    <div class="relative w-28 h-28 flex items-center justify-center mb-8" aria-hidden="true">
+                        <div class="absolute inset-0 border-4 border-slate-800 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-transparent border-t-[#FF7A21] border-r-[#FF7A21] rounded-full animate-spin-slow transform-gpu"></div>
+                        <div class="absolute inset-2 border-4 border-transparent border-b-[#FF7A21] border-l-[#FF7A21] rounded-full animate-spin-slow transform-gpu" style="animation-direction: reverse; animation-duration: 4s;"></div>
+                        
+                        <div class="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center z-10 shadow-[0_0_20px_rgba(255,122,33,0.3)] animate-pulse-glow border border-slate-700 transform-gpu">
+                            <span class="material-symbols-outlined text-[28px] text-[#FF7A21] icon-fill">graphic_eq</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Acessibilidade Padrão W3C -->
+                    <div class="w-full space-y-3 mb-2 px-2" role="status" aria-live="polite" aria-atomic="true">
+                        <div class="flex justify-between items-end px-1">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-bold text-[var(--text-light)] uppercase tracking-widest mb-1">Status</span>
+                                <span id="status-text" class="text-sm font-bold text-slate-200" data-i18n="statusConnecting">Conectando...</span>
+                            </div>
+                            <span id="progress-text" class="text-2xl font-black text-[var(--primary)] tracking-tighter">0%</span>
+                        </div>
+                        
+                        <div class="h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-700/50 p-0.5" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="aria-progress-container">
+                            <div id="progress-bar" class="h-full bg-[var(--primary)] rounded-full progress-bar-fill relative overflow-hidden transform-gpu" style="width: 0%">
+                                <div class="absolute top-0 left-0 bottom-0 w-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer_2s_infinite] transform-gpu"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ESTADO 3: SUCESSO -->
+                <div id="success-state" class="hidden flex-col items-center relative z-10 w-full animate-[fadeIn_0.5s_ease-out]">
+                    
+                    <div class="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-6 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                        <span class="material-symbols-outlined text-[32px] icon-fill" aria-hidden="true">check_circle</span>
+                    </div>
+
+                    <!-- Card de Resumo do Arquivo -->
+                    <div class="flex items-center w-full bg-slate-900/80 rounded-[2rem] p-4 border border-slate-700/50 mb-6 gap-4">
+                        <div class="w-16 h-16 bg-slate-800 rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-slate-700">
+                            <span class="material-symbols-outlined text-slate-500 text-[28px]" aria-hidden="true">audio_file</span>
+                        </div>
+                        <div class="flex flex-col flex-grow overflow-hidden pr-2">
+                            <!-- ID dinâmico injetado pela tradução -->
+                            <h3 id="display-filename" class="text-sm font-bold text-slate-200 truncate" data-i18n-title="fileNameTitle" title="Áudio Convertido.mp3" data-i18n="fileNameText">Áudio Convertido.mp3</h3>
+                            <div class="flex items-center gap-3 mt-1">
+                                <span class="text-[11px] text-slate-400 font-medium">320 kbps</span>
+                                <span class="w-1 h-1 rounded-full bg-slate-600"></span>
+                                <span class="text-[11px] text-slate-400 font-medium">~4.2 MB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col w-full gap-3">
+                        <button id="btn-download" class="w-full py-4 rounded-[2rem] bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold tracking-[0.05em] text-sm uppercase transition-all flex items-center justify-center gap-3 shadow-[0_8px_20px_-5px_rgba(16,185,129,0.4)] border border-emerald-400/20 group relative overflow-hidden disabled:opacity-80 disabled:cursor-not-allowed disabled:hover:bg-slate-700 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500">
+                            <span class="flex items-center justify-center gap-3 w-full h-full" id="btn-download-content">
+                                <span class="material-symbols-outlined group-hover:-translate-y-1 transition-transform" id="btn-download-icon" aria-hidden="true">download</span>
+                                <span data-i18n="btnDownload" id="btn-download-text">Baixar MP3</span>
+                            </span>
+                        </button>
+                        
+                        <button id="btn-convert-another" class="w-full py-4 rounded-[2rem] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold tracking-[0.05em] text-sm uppercase transition-all flex items-center justify-center gap-3 border border-slate-700/50 active:scale-95 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500">
+                            <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+                            <span data-i18n="btnNew">Novo Link</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Alerta de Erro Crítico Acessível (role="alert" adicionado) -->
+                <div id="error-message" class="hidden absolute top-4 left-1/2 -translate-x-1/2 w-[90%] p-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs sm:text-sm flex items-center justify-center gap-2 backdrop-blur-md z-20 shadow-lg transform-gpu animate-[fadeIn_0.2s_ease-out]" role="alert" aria-live="assertive">
+                    <span class="material-symbols-outlined text-[18px] icon-fill flex-shrink-0" aria-hidden="true">error</span>
+                    <span id="error-text" class="font-medium text-center" data-i18n="errorGeneric">Erro ao processar o link.</span>
+                </div>
+
+            </div>
+
+            <!-- Seção de Recursos -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl mt-12">
+                <div class="coin-card p-6 md:p-8 rounded-[2rem] flex flex-col items-center text-center group anim-card-1">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-5 text-[#FF7A21] transition-colors duration-300 hover-card-icon">
+                        <span class="material-symbols-outlined text-[28px]" aria-hidden="true">bolt</span>
+                    </div>
+                    <h3 class="font-bold text-slate-100 mb-2 text-[13px] uppercase tracking-widest" data-i18n="feat1Title">Ultra Rápido</h3>
+                    <p class="text-[13px] text-slate-400 font-medium leading-relaxed" data-i18n="feat1Desc">Servidores otimizados garantem a conversão em poucos segundos com latência quase nula.</p>
+                </div>
+                
+                <div class="coin-card p-6 md:p-8 rounded-[2rem] flex flex-col items-center text-center group anim-card-2">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-5 text-[#FF7A21] transition-colors duration-300 hover-card-icon">
+                        <span class="material-symbols-outlined text-[28px]" aria-hidden="true">security</span>
+                    </div>
+                    <h3 class="font-bold text-slate-100 mb-2 text-[13px] uppercase tracking-widest" data-i18n="feat2Title">100% Seguro</h3>
+                    <p class="text-[13px] text-slate-400 font-medium leading-relaxed" data-i18n="feat2Desc">Ambiente isolado. Arquivos absolutamente limpos, sem rastreadores ou malwares.</p>
+                </div>
+                
+                <div class="coin-card p-6 md:p-8 rounded-[2rem] flex flex-col items-center text-center group anim-card-3">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-5 text-[#FF7A21] transition-colors duration-300 hover-card-icon">
+                        <span class="material-symbols-outlined text-[28px]" aria-hidden="true">devices</span>
+                    </div>
+                    <h3 class="font-bold text-slate-100 mb-2 text-[13px] uppercase tracking-widest" data-i18n="feat3Title">Ecossistema Multiplataforma</h3>
+                    <p class="text-[13px] text-slate-400 font-medium leading-relaxed" data-i18n="feat3Desc">Arquitetura fluida e adaptativa, entregando a mesma performance excepcional seja no seu desktop, tablet ou smartphone.</p>
+                </div>
+            </div>
+
+        </main>
+        
+        <footer class="w-full py-6 text-center border-t border-white/5 mt-8">
+            <p class="text-[11px] text-slate-500 font-medium">
+                Desenvolvido por <span class="text-[#FF7A21] font-bold">@ Rodrigo Souza Feliciano</span> · 
+                <span id="footer-year"></span>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.add('is-loaded');
+            document.documentElement.style.setProperty('--loaded', '1');
+
+            // --- GESTÃO DE IDIOMAS EXTREMA (i18n em todos os níveis do DOM) ---
+            const translations = {
+                'pt': {
+                    docTitle: 'AudioSync — Conversor de mídia YouTube para MP3',
+                    metaDesc: 'AudioSync — Conversor de mídia YouTube para MP3. Extração premium com alta fidelidade de áudio.',
+                    titlePrefix: 'YouTube p/',
+                    titleSuffix: 'MP3',
+                    subtitle: 'Extração de Alta Fidelidade',
+                    placeholder: 'Cole o link do vídeo aqui...',
+                    btnConvert: 'Iniciar Conversão',
+                    statusConnecting: 'Conectando...',
+                    btnDownload: 'Baixar MP3',
+                    btnNew: 'Novo Link',
+                    feat1Title: 'Ultra Rápido',
+                    feat1Desc: 'Servidores otimizados garantem a conversão em poucos segundos com latência quase nula.',
+                    feat2Title: '100% Seguro',
+                    feat2Desc: 'Ambiente isolado. Arquivos absolutamente limpos, sem rastreadores ou malwares.',
+                    feat3Title: 'Ecossistema Multiplataforma',
+                    feat3Desc: 'Arquitetura fluida e adaptativa, entregando a mesma performance excepcional seja no seu desktop, tablet ou smartphone.',
+                    infoTitle: 'AudioSync — Conversor de mídia YouTube para MP3',
+                    infoDesc: 'Plataforma de engenharia de software desenvolvida e mantida por <strong class="text-[#FF7A21]">@ Rodrigo Souza Feliciano</strong>. <br><br>Desenhada com arquitetura de ponta para otimizar a extração e conversão de mídia, garantindo a mais alta fidelidade de áudio com foco extremo em performance, segurança e usabilidade premium.',
+                    infoClose: 'Entendido',
+                    errorInvalid: 'Link inválido. Insira uma URL oficial do YouTube.',
+                    simMsg1: 'Buscando metadados do vídeo...',
+                    simMsg2: 'Isolando faixa de áudio original...',
+                    simMsg3: 'Convertendo para MP3 (320kbps)...',
+                    simMsg4: 'Otimizando bitrate...',
+                    simMsg5: 'Aplicando ID3 Tags...',
+                    simMsg6: 'Empacotando arquivo...',
+                    btnPreparing: 'Preparando...',
+                    btnDone: 'Concluído!',
+                    tooltipLang: 'Mudar Idioma',
+                    tooltipInfo: 'Informações',
+                    tooltipSocial: 'Minhas Redes Sociais',
+                    ariaInfo: 'Informações do Sistema',
+                    ariaSocial: 'Redes Sociais',
+                    ariaClose: 'Fechar informações',
+                    errorGeneric: 'Erro ao processar o link.',
+                    valEmpty: 'Por favor, preencha este campo com o link do vídeo.',
+                    fileNameText: 'Áudio Convertido.mp3',
+                    fileNameTitle: 'Áudio Convertido.mp3',
+                    flag: '🇧🇷'
+                },
+                'en': {
+                    docTitle: 'AudioSync — YouTube to MP3 Media Converter',
+                    metaDesc: 'AudioSync — YouTube to MP3 Media Converter. Premium extraction with high audio fidelity.',
+                    titlePrefix: 'YouTube to',
+                    titleSuffix: 'MP3',
+                    subtitle: 'High-Fidelity Extraction',
+                    placeholder: 'Paste the video link here...',
+                    btnConvert: 'Start Conversion',
+                    statusConnecting: 'Connecting...',
+                    btnDownload: 'Download MP3',
+                    btnNew: 'New Link',
+                    feat1Title: 'Lightning Fast',
+                    feat1Desc: 'Optimized servers ensure your conversion is done in a matter of seconds with near-zero latency.',
+                    feat2Title: '100% Secure',
+                    feat2Desc: 'Isolated environment. Absolutely clean files, no trackers or malware.',
+                    feat3Title: 'Cross-Platform Ecosystem',
+                    feat3Desc: 'Fluid and adaptive architecture, delivering the same exceptional performance whether on your desktop, tablet, or smartphone.',
+                    infoTitle: 'AudioSync — YouTube to MP3 Media Converter',
+                    infoDesc: 'Software engineering platform developed and maintained by <strong class="text-[#FF7A21]">@ Rodrigo Souza Feliciano</strong>. <br><br>Designed with cutting-edge architecture to optimize media extraction and conversion, ensuring the highest audio fidelity with an extreme focus on performance, security, and premium usability.',
+                    infoClose: 'Understood',
+                    errorInvalid: 'Invalid link. Please enter an official YouTube URL.',
+                    simMsg1: 'Fetching video metadata...',
+                    simMsg2: 'Isolating original audio track...',
+                    simMsg3: 'Converting to MP3 (320kbps)...',
+                    simMsg4: 'Optimizing bitrate...',
+                    simMsg5: 'Applying ID3 Tags...',
+                    simMsg6: 'Packaging file...',
+                    btnPreparing: 'Preparing...',
+                    btnDone: 'Done!',
+                    tooltipLang: 'Change Language',
+                    tooltipInfo: 'Information',
+                    tooltipSocial: 'My Social Networks',
+                    ariaInfo: 'System Information',
+                    ariaSocial: 'Social Networks',
+                    ariaClose: 'Close information',
+                    errorGeneric: 'Error processing the link.',
+                    valEmpty: 'Please fill out this field with the video link.',
+                    fileNameText: 'Converted Audio.mp3',
+                    fileNameTitle: 'Converted Audio.mp3',
+                    flag: '🇺🇸'
+                }
+            };
+
+            let currentLang = navigator.language?.startsWith('en') ? 'en' : 'pt';
+            const btnLang = document.getElementById('btn-lang');
+            const urlInput = document.getElementById('youtube-url');
+
+            function updateLanguage() {
+                const t = translations[currentLang];
+                btnLang.textContent = t.flag;
+                
+                // Tradução Profunda de Raiz (SEO & Meta)
+                document.documentElement.lang = currentLang === 'pt' ? 'pt-br' : 'en';
+                document.getElementById('page-title').textContent = t.docTitle;
+                document.getElementById('meta-desc').setAttribute('content', t.metaDesc);
+
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (t[key]) el.textContent = t[key];
+                });
+
+                document.querySelectorAll('[data-i18n-html]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-html');
+                    if (t[key]) el.innerHTML = t[key];
+                });
+
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-placeholder');
+                    if (t[key]) el.placeholder = t[key];
+                });
+
+                document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-title');
+                    if (t[key]) el.title = t[key];
+                });
+
+                document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-aria');
+                    if (t[key]) el.setAttribute('aria-label', t[key]);
+                });
+            }
+
+            updateLanguage(); // Applica idioma inicial
+
+            btnLang.addEventListener('click', () => {
+                currentLang = currentLang === 'pt' ? 'en' : 'pt';
+                updateLanguage();
+            });
+
+            // --- LÓGICA DO MODAL DE INFORMAÇÕES E GESTÃO DE FOCO (A11y Avançado) ---
+            const btnInfo = document.getElementById('btn-info');
+            const infoModal = document.getElementById('info-modal');
+            const infoModalContent = document.getElementById('info-modal-content');
+            const btnCloseInfo = document.getElementById('btn-close-info');
+            const btnCloseInfoBottom = document.getElementById('btn-close-info-bottom');
+            
+            const btnSocial = document.getElementById('btn-social');
+            const socialMenu = document.getElementById('social-menu');
+            const appWrapper = document.getElementById('app-wrapper');
+            
+            let lastFocusedElement = null; // Guardião de Foco
+
+            function openInfoModal() {
+                fecharMenusGlobais(); 
+                lastFocusedElement = document.activeElement; // Salva quem clicou
+                
+                infoModal.classList.remove('hidden');
+                infoModal.setAttribute('aria-hidden', 'false');
+                appWrapper.setAttribute('inert', ''); // Trava navegação atrás do vidro
+                
+                setTimeout(() => {
+                    infoModal.classList.remove('opacity-0');
+                    infoModalContent.classList.replace('scale-95', 'scale-100');
+                    btnCloseInfoBottom.focus(); 
+                }, 50);
+            }
+
+            function closeInfoModal() {
+                infoModal.classList.add('opacity-0');
+                infoModalContent.classList.replace('scale-100', 'scale-95');
+                infoModal.setAttribute('aria-hidden', 'true');
+                appWrapper.removeAttribute('inert'); 
+                
+                setTimeout(() => {
+                    infoModal.classList.add('hidden');
+                    if(lastFocusedElement) lastFocusedElement.focus(); // Devolve o foco
+                }, 300);
+            }
+
+            function fecharMenusGlobais() {
+                if(!infoModal.classList.contains('hidden')) closeInfoModal();
+                if(socialMenu.style.display !== 'none') {
+                    socialMenu.style.display = 'none';
+                    btnSocial.setAttribute('aria-expanded', 'false');
+                    btnSocial.focus();
+                }
+            }
+
+            btnInfo.addEventListener('click', openInfoModal);
+            btnCloseInfo.addEventListener('click', closeInfoModal);
+            btnCloseInfoBottom.addEventListener('click', closeInfoModal);
+            
+            infoModal.addEventListener('click', (e) => {
+                if (e.target === infoModal) closeInfoModal();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') fecharMenusGlobais();
+            });
+            
+            document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+            // --- LÓGICA DO MENU SOCIAL ---
+            btnSocial.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = btnSocial.getAttribute('aria-expanded') === 'true';
+                
+                if(!isExpanded) {
+                    if(!infoModal.classList.contains('hidden')) closeInfoModal();
+                    socialMenu.style.display = 'flex';
+                    btnSocial.setAttribute('aria-expanded', 'true');
+                } else {
+                    fecharMenusGlobais();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!socialMenu.contains(e.target) && !btnSocial.contains(e.target)) {
+                    if(socialMenu.style.display !== 'none') fecharMenusGlobais();
+                }
+            });
+
+            // --- ESTADOS DO CONVERSOR E ANIMAÇÕES ---
+            const form = document.getElementById('converter-form');
+            const mainPanel = document.getElementById('main-panel');
+            
+            const processingState = document.getElementById('processing-state');
+            const successState = document.getElementById('success-state');
+            const errorContainer = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            
+            const statusText = document.getElementById('status-text');
+            const progressText = document.getElementById('progress-text');
+            const progressBar = document.getElementById('progress-bar');
+            const ariaProgressContainer = document.getElementById('aria-progress-container');
+            
+            const btnConvert = document.getElementById('btn-convert');
+            const btnConvertAnother = document.getElementById('btn-convert-another');
+            const btnDownload = document.getElementById('btn-download');
+            const btnDownloadIcon = document.getElementById('btn-download-icon');
+            const btnDownloadText = document.getElementById('btn-download-text');
+            const btnClearInput = document.getElementById('btn-clear-input');
+
+            function switchState(fromEl, toEl) {
+                fromEl.style.opacity = '0';
+                setTimeout(() => {
+                    fromEl.classList.add('hidden');
+                    fromEl.classList.remove('flex');
+                    fromEl.style.opacity = '';
+                    toEl.classList.remove('hidden');
+                    toEl.classList.add('flex');
+                    toEl.style.opacity = '0';
+                    requestAnimationFrame(() => {
+                        toEl.style.transition = 'opacity 0.3s ease';
+                        toEl.style.opacity = '1';
+                    });
+                }, 200);
+            }
+
+            urlInput.addEventListener('input', () => {
+                btnClearInput.classList.toggle('hidden', urlInput.value.length === 0);
+            });
+
+            btnClearInput.addEventListener('click', () => {
+                urlInput.value = '';
+                urlInput.focus();
+                btnClearInput.classList.add('hidden');
+            });
+
+            urlInput.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData).getData('text').trim();
+                urlInput.value = pasted;
+                btnClearInput.classList.toggle('hidden', pasted.length === 0);
+            });
+
+            // Validação de URL do YouTube (watch, shorts, live, embed, youtu.be)
+            const ytRegex = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|playlist\?(?:.*&)?list=|embed\/|v\/)|youtu\.be\/)[a-zA-Z0-9_-]+/;
+
+            // Estado da aplicação
+            let dadosDownload   = { url: null, titulo: null };
+            let intervaloPolling = null;
+            let errorTimeout;
+            let activeTimeouts  = [];
+            let isDownloading   = false;
+            let isSubmitting    = false;
+
+            function clearAllActiveTimeouts() {
+                activeTimeouts.forEach(clearTimeout);
+                activeTimeouts = [];
+            }
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                if (btnConvert.disabled || isSubmitting) return;
+                isSubmitting = true;
+                
+                const url = urlInput.value.trim();
+                
+                if(errorTimeout) clearTimeout(errorTimeout);
+                errorContainer.classList.add('hidden');
+                mainPanel.classList.remove('animate-[shake_0.4s_ease-in-out]');
+
+                if (!url) {
+                    showError('valEmpty');
+                    urlInput.focus();
+                    isSubmitting = false;
+                    return;
+                }
+
+                if (!ytRegex.test(url)) {
+                    showError('errorInvalid'); 
+                    urlInput.focus();
+                    isSubmitting = false;
+                    return;
+                }
+
+                btnConvert.disabled = true;
+                iniciarConversaoReal(url);
+            });
+
+            btnConvertAnother.addEventListener('click', () => {
+                if (isDownloading) return; 
+                resetUI();
+            });
+
+            btnDownload.addEventListener('click', () => {
+                if (btnDownload.disabled || !dadosDownload.url) return;
+
+                btnDownload.disabled = true;
+                isDownloading = true;
+                const t = translations[currentLang];
+
+                // Feedback visual — spinner
+                btnDownloadIcon.className = 'material-symbols-outlined animate-spin-slow';
+                btnDownloadIcon.textContent = 'autorenew';
+                btnDownloadText.setAttribute('data-i18n', 'btnPreparing');
+                btnDownloadText.textContent = t.btnPreparing;
+                btnDownload.classList.replace('bg-emerald-500', 'bg-slate-700');
+                btnDownload.classList.replace('hover:bg-emerald-600', 'hover:bg-slate-600');
+                btnDownload.classList.replace('shadow-[0_8px_20px_-5px_rgba(16,185,129,0.4)]', 'shadow-none');
+                btnDownload.classList.replace('border-emerald-400/20', 'border-slate-500/50');
+
+                // Dispara download via POST /api/stream (proxy seguro no servidor)
+                const formDownload = document.createElement('form');
+                formDownload.method = 'POST';
+                formDownload.action = '/api/stream';
+                formDownload.style.display = 'none';
+
+                const inputUrl = document.createElement('input');
+                inputUrl.type  = 'hidden';
+                inputUrl.name  = 'downloadUrl';
+                inputUrl.value = dadosDownload.url;
+
+                const inputTitulo = document.createElement('input');
+                inputTitulo.type  = 'hidden';
+                inputTitulo.name  = 'title';
+                inputTitulo.value = dadosDownload.titulo || 'audio';
+
+                formDownload.appendChild(inputUrl);
+                formDownload.appendChild(inputTitulo);
+                document.body.appendChild(formDownload);
+                formDownload.submit();
+                document.body.removeChild(formDownload);
+
+                // Feedback visual — conclusão
+                const t1 = setTimeout(() => {
+                    btnDownloadIcon.className = 'material-symbols-outlined icon-fill text-emerald-400';
+                    btnDownloadIcon.textContent = 'check_circle';
+                    btnDownloadText.setAttribute('data-i18n', 'btnDone');
+                    btnDownloadText.textContent = translations[currentLang].btnDone;
+
+                    const t2 = setTimeout(() => {
+                        btnDownloadIcon.className = 'material-symbols-outlined group-hover:-translate-y-1 transition-transform';
+                        btnDownloadIcon.textContent = 'download';
+                        btnDownloadText.setAttribute('data-i18n', 'btnDownload');
+                        btnDownloadText.textContent = translations[currentLang].btnDownload;
+                        btnDownload.classList.replace('bg-slate-700', 'bg-emerald-500');
+                        btnDownload.classList.replace('hover:bg-slate-600', 'hover:bg-emerald-600');
+                        btnDownload.classList.add('shadow-[0_8px_20px_-5px_rgba(16,185,129,0.4)]');
+                        btnDownload.classList.replace('border-slate-500/50', 'border-emerald-400/20');
+                        btnDownload.disabled = false;
+                        isDownloading = false;
+                    }, 2000);
+                    activeTimeouts.push(t2);
+                }, 1500);
+                activeTimeouts.push(t1);
+            });
+
+            function showError(msgKey) {
+                errorText.setAttribute('data-i18n', msgKey);
+                errorText.textContent = translations[currentLang][msgKey];
+                
+                errorContainer.classList.remove('hidden');
+                mainPanel.classList.remove('animate-[shake_0.4s_ease-in-out]');
+                void mainPanel.offsetWidth; 
+                mainPanel.classList.add('animate-[shake_0.4s_ease-in-out]');
+                
+                mainPanel.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+                mainPanel.style.boxShadow = '0 0 30px rgba(244, 63, 94, 0.15)';
+                
+                errorTimeout = setTimeout(() => {
+                    errorContainer.classList.add('hidden');
+                    mainPanel.style.borderColor = '';
+                    mainPanel.style.boxShadow = '';
+                }, 4000);
+            }
+
+            function updateProgress(percent, msgKey) {
+                progressBar.style.width = `${percent}%`;
+                progressText.textContent = `${percent}%`;
+                statusText.setAttribute('data-i18n', msgKey);
+                statusText.textContent = translations[currentLang][msgKey];
+                
+                // Atualização Acessível da Porcentagem Interna
+                ariaProgressContainer.setAttribute('aria-valuenow', percent);
+            }
+
+            function showSuccess() {
+                mainPanel.classList.remove('active-glow');
+                switchState(processingState, successState);
+                
+                // Atualiza o nome do arquivo exibido com o título real do vídeo
+                if (dadosDownload.titulo) {
+                    const displayName = dadosDownload.titulo + '.mp3';
+                    const filenameEl = document.getElementById('display-filename');
+                    filenameEl.textContent = displayName;
+                    filenameEl.title = displayName;
+                }
+
+                ariaProgressContainer.setAttribute('aria-valuenow', '0');
+            }
+
+            function resetUI() {
+                dadosDownload = { url: null, titulo: null };
+                if (intervaloPolling) { clearInterval(intervaloPolling); intervaloPolling = null; }
+                clearAllActiveTimeouts();
+                isSubmitting = false;
+
+                // Garantir que todos os estados visuais são limpos
+                const currentState = !successState.classList.contains('hidden') ? successState : 
+                                     !processingState.classList.contains('hidden') ? processingState : null;
+                
+                if (currentState) {
+                    switchState(currentState, form);
+                }
+
+                mainPanel.classList.remove('active-glow');
+                if(errorTimeout) clearTimeout(errorTimeout);
+                errorContainer.classList.add('hidden');
+                mainPanel.style.borderColor = '';
+                mainPanel.style.boxShadow = '';
+
+                form.reset();
+                urlInput.value = '';
+                btnConvert.disabled = false;
+                btnClearInput.classList.add('hidden');
+                
+                progressBar.style.transition = 'none';
+                progressBar.style.width = '0%';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        progressBar.style.transition = '';
+                    });
+                });
+                
+                progressText.textContent = '0%';
+
+                // Restaura o nome genérico do arquivo
+                const filenameEl = document.getElementById('display-filename');
+                const t = translations[currentLang];
+                filenameEl.textContent = t.fileNameText;
+                filenameEl.title = t.fileNameTitle;
+
+                urlInput.focus();
+            }
+
+            // ── Integração com Backend ────────────────────────────────
+            //
+            // A API youtube-mp36 é SÍNCRONA: retorna o link MP3 pronto na 1ª chamada.
+            // Resposta do backend: { success:true, downloadUrl:"https://...", title:"...", filesize:N, duration:N }
+            // NÃO há polling — a barra de progresso anima visualmente enquanto aguarda a resposta da API.
+
+            async function iniciarConversaoReal(url) {
+                clearAllActiveTimeouts();
+                if (intervaloPolling) { clearInterval(intervaloPolling); intervaloPolling = null; }
+
+                dadosDownload = { url: null, titulo: null };
+
+                if (errorTimeout) clearTimeout(errorTimeout);
+                errorContainer.classList.add('hidden');
+                mainPanel.classList.remove('animate-[shake_0.4s_ease-in-out]');
+                mainPanel.style.borderColor = '';
+                mainPanel.style.boxShadow   = '';
+
+                // Transição para tela de processamento
+                mainPanel.classList.add('active-glow');
+                switchState(form, processingState);
+
+                updateProgress(0, 'statusConnecting');
+
+                // Animação visual escalonada enquanto a API processa (pode demorar 5-30s)
+                // Os timeouts são cancelados assim que a resposta chega
+                const stepsVisuais = [
+                    { pct: 10,  msg: 'simMsg1', delay: 400   },
+                    { pct: 25,  msg: 'simMsg2', delay: 1500  },
+                    { pct: 45,  msg: 'simMsg3', delay: 3000  },
+                    { pct: 65,  msg: 'simMsg4', delay: 5000  },
+                    { pct: 80,  msg: 'simMsg5', delay: 8000  },
+                    { pct: 90,  msg: 'simMsg6', delay: 13000 },
+                ];
+
+                stepsVisuais.forEach(({ pct, msg, delay }) => {
+                    const sid = setTimeout(() => {
+                        // Só avança se ainda estiver processando (não terminou antes)
+                        if (!dadosDownload.url) updateProgress(pct, msg);
+                    }, delay);
+                    activeTimeouts.push(sid);
+                });
+
+                try {
+                    // CHAMADA ÚNICA à API — síncrona, já retorna o link MP3 pronto
+                    const resInicio = await fetch('/api/start', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({ url })
+                    });
+
+                    const dadosInicio = await resInicio.json();
+
+                    // Cancela todos os timeouts visuais — a resposta já chegou
+                    clearAllActiveTimeouts();
+
+                    if (!dadosInicio.success) {
+                        throw new Error(dadosInicio.error || 'Erro ao iniciar a conversão.');
+                    }
+
+                    // Salva o link e título em memória para o botão de download
+                    dadosDownload.url    = dadosInicio.downloadUrl;
+                    dadosDownload.titulo = dadosInicio.title || 'Audio';
+
+                    updateProgress(100, 'simMsg6');
+
+                    // Pequeno delay visual antes de mostrar a tela de sucesso
+                    const sid = setTimeout(() => showSuccess(), 600);
+                    activeTimeouts.push(sid);
+
+                } catch (erro) {
+                    clearAllActiveTimeouts();
+                    console.error('Erro em iniciarConversaoReal:', erro.message);
+
+                    // Volta para o formulário com mensagem de erro
+                    showError('errorGeneric');
+                    switchState(processingState, form);
+                    mainPanel.classList.remove('active-glow');
+                    btnConvert.disabled = false;
+                    isSubmitting = false;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
