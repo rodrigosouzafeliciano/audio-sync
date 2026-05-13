@@ -735,27 +735,21 @@
                 btnDownload.classList.replace('shadow-[0_8px_20px_-5px_rgba(16,185,129,0.4)]', 'shadow-none');
                 btnDownload.classList.replace('border-emerald-400/20', 'border-slate-500/50');
 
-                // Dispara download via POST /api/stream (proxy seguro no servidor)
-                const formDownload = document.createElement('form');
-                formDownload.method = 'POST';
-                formDownload.action = '/api/stream';
-                formDownload.style.display = 'none';
-
-                const inputUrl = document.createElement('input');
-                inputUrl.type  = 'hidden';
-                inputUrl.name  = 'downloadUrl';
-                inputUrl.value = dadosDownload.url;
-
-                const inputTitulo = document.createElement('input');
-                inputTitulo.type  = 'hidden';
-                inputTitulo.name  = 'title';
-                inputTitulo.value = dadosDownload.titulo || 'audio';
-
-                formDownload.appendChild(inputUrl);
-                formDownload.appendChild(inputTitulo);
-                document.body.appendChild(formDownload);
-                formDownload.submit();
-                document.body.removeChild(formDownload);
+                // Dispara o download nativamente no navegador usando um link âncora 
+                // para evitar problemas de redirect do POST ou nomes de arquivo corrompidos
+                const a = document.createElement('a');
+                a.href = dadosDownload.url;
+                // Atributo download ajuda o navegador a entender que é um arquivo, 
+                // embora o Content-Disposition do servidor já faça isso.
+                a.download = (dadosDownload.titulo || 'audio') + '.mp3';
+                a.target = '_blank'; // Abre em nova aba caso o navegador bloqueie o download direto
+                a.style.display = 'none';
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => document.body.removeChild(a), 100);
 
                 // Feedback visual — conclusão
                 const t1 = setTimeout(() => {
