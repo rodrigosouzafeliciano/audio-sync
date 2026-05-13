@@ -1,16 +1,14 @@
 /**
- * AudioSync — Conversor de mídia YouTube para MP3 (Proxy Seguro)
+ * AudioSync — Conversor de mídia YouTube para MP3
  *
- * A API youtube-mp36 é SÍNCRONA — retorna o link MP3 direto na 1ª chamada.
- * Resposta real confirmada via cURL:
- * { msg:"success", progress:100, status:"ok", link:"https://...", title:"...", filesize:N, duration:N }
+ * CORREÇÃO VERCEL HOBBY: O plano Hobby tem limite de 4.5MB no body da resposta,
+ * o que quebra o streaming via pipe(). Solução: /api/stream agora faz um
+ * redirect 302 direto para a URL do MP3, deixando o browser baixar diretamente.
  *
  * Endpoints:
  *   POST /api/start   → Chama a API, retorna o link de download pronto
- *   POST /api/stream  → Proxy seguro: baixa o MP3 e entrega ao browser
+ *   GET  /api/stream  → Redirect 302 para a URL real do MP3 (download direto)
  *   GET  /api/health  → Health check
- *
- * NOTA: Não há /api/status — a API não tem polling, retorna tudo de uma vez.
  */
 
 const express = require('express');
@@ -36,7 +34,6 @@ const apiKeys = (process.env.API_KEYS || '')
 
 if (apiKeys.length === 0) {
   console.error('⛔ ERRO FATAL: Variável API_KEYS não definida ou vazia.');
-  console.error('   Defina no .env (local) ou no Vercel Dashboard (produção).');
 }
 
 console.log(`🔑 ${apiKeys.length} chave(s) de API carregada(s)`);
@@ -44,15 +41,12 @@ console.log(`🌐 Host: ${API_HOST}`);
 
 // ── Constantes ──────────────────────────────────────────────
 
-// A API pode demorar até 30s para vídeos longos não cacheados
 const TIMEOUT_REQUEST  = 35_000;
-const TIMEOUT_DOWNLOAD = 60_000;
 const FILENAME_MAX_LEN = 100;
 
 const REGEX_VIDEO_ID = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/|v\/)|youtu\.be\/)([0-9A-Za-z_-]{11})/;
 
 // ── Rotação de Chaves ───────────────────────────────────────
-// Se uma key retornar 429 (rate limit) ou 403 (quota), tenta a próxima.
 
 async function fetchWithRotation(config) {
   if (apiKeys.length === 0) {
@@ -114,12 +108,6 @@ function sanitizeFilename(raw) {
 }
 
 // ── POST /api/start ─────────────────────────────────────────
-//
-// A API youtube-mp36 é SÍNCRONA.
-// Resposta de sucesso: { msg:"success", progress:100, status:"ok", link:"https://...", title:"..." }
-// Resposta de falha:   { msg:"fail", ... }
-//
-// O backend extrai o "link" e retorna ao frontend como "downloadUrl".
 
 app.post('/api/start', async (req, res) => {
   console.log('\n📥 POST /api/start');
@@ -141,12 +129,11 @@ app.post('/api/start', async (req, res) => {
     const { data } = await fetchWithRotation({
       method: 'GET',
       url:    API_URL,
-      params: { id: videoId, format: 'mp3', audioQuality: '128' },
+      params: { id: videoId },
     });
 
     console.log(`   Resposta da API: status=${data?.status} | msg=${data?.msg} | progress=${data?.progress}`);
 
-    // Verifica falha explícita da API
     if (data?.msg === 'fail' || data?.status === 'fail') {
       console.error('   ❌ API retornou falha:', JSON.stringify(data));
       return res.status(422).json({
@@ -154,9 +141,6 @@ app.post('/api/start', async (req, res) => {
       });
     }
 
-    // Verifica se o link foi retornado
-    // A API youtube-mp36 retorna o campo "link" (confirmado via cURL)
-    // Fallback para "url" por segurança caso a API mude o campo
     const downloadLink = data?.link || data?.url || null;
 
     if (!downloadLink) {
@@ -167,9 +151,7 @@ app.post('/api/start', async (req, res) => {
     }
 
     console.log(`   ✅ Link obtido | Título: ${data.title}`);
-    console.log(`   📦 Tamanho: ${(data.filesize / 1024 / 1024).toFixed(2)} MB | Duração: ${Math.round(data.duration)}s`);
 
-    // Retorna ao frontend com "downloadUrl" (nome padronizado)
     return res.json({
       success:     true,
       downloadUrl: downloadLink,
@@ -190,14 +172,40 @@ app.post('/api/start', async (req, res) => {
   }
 });
 
-// ── POST /api/stream ────────────────────────────────────────
+// ── GET /api/stream ─────────────────────────────────────────
 //
-// Proxy seguro: recebe a downloadUrl e faz streaming do MP3 para o browser.
-// Necessário porque a URL do servidor da API tem tokens temporários e
-// pode ter restrições de CORS que impedem o browser de acessar diretamente.
+// CORREÇÃO VERCEL HOBBY: Ao invés de fazer proxy/pipe (que estoura o limite
+// de 4.5MB do Vercel Hobby), fazemos um redirect 302 direto para a URL do MP3.
+// O browser baixa o arquivo diretamente do servidor da API, sem passar pelo Vercel.
+//
+// A URL chega como query param: GET /api/stream?url=https://...&title=Nome
 
-app.post('/api/stream', async (req, res) => {
-  console.log('\n📥 POST /api/stream');
+app.get('/api/stream', (req, res) => {
+  console.log('\n📥 GET /api/stream');
+
+  const { url: downloadUrl, title } = req.query;
+
+  if (!downloadUrl || typeof downloadUrl !== 'string') {
+    return res.status(400).send('URL de download não fornecida.');
+  }
+
+  try {
+    const filename = sanitizeFilename(title);
+    console.log(`   Redirecionando para download: ${filename}.mp3`);
+
+    // Redirect direto para a URL do MP3
+    // O browser vai baixar o arquivo diretamente, sem passar pelo Vercel
+    return res.redirect(302, downloadUrl);
+
+  } catch (error) {
+    console.error(`   ❌ /api/stream: ${error.message}`);
+    return res.status(500).send('Falha ao redirecionar para o arquivo de áudio.');
+  }
+});
+
+// Manter compatibilidade com POST /api/stream (caso o frontend ainda use)
+app.post('/api/stream', (req, res) => {
+  console.log('\n📥 POST /api/stream → redirecionando para GET');
 
   const { downloadUrl, title } = req.body;
 
@@ -207,42 +215,13 @@ app.post('/api/stream', async (req, res) => {
 
   try {
     const filename = sanitizeFilename(title);
-    console.log(`   Arquivo: ${filename}.mp3`);
-    console.log(`   URL: ${downloadUrl.substring(0, 60)}...`);
+    console.log(`   Redirecionando para download: ${filename}.mp3`);
 
-    const stream = await axios({
-      method:       'GET',
-      url:          downloadUrl,
-      responseType: 'stream',
-      timeout:      TIMEOUT_DOWNLOAD,
-    });
-
-    // Nome ASCII para compatibilidade máxima com browsers
-    const asciiFilename = filename.replace(/[^\x20-\x7E]/g, '') || 'audio';
-
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${asciiFilename}.mp3"; filename*=UTF-8''${encodeURIComponent(filename)}.mp3`
-    );
-    res.setHeader('Content-Type', 'audio/mpeg');
-
-    if (stream.headers['content-length']) {
-      res.setHeader('Content-Length', stream.headers['content-length']);
-    }
-
-    // Pipe direto — sem buffer em memória (eficiente para arquivos grandes)
-    stream.data.pipe(res);
-
-    stream.data.on('error', (err) => {
-      console.error('   ❌ Erro no stream:', err.message);
-      if (!res.headersSent) res.status(500).send('Erro durante o download.');
-    });
-
-    res.on('finish', () => console.log('   ✅ Download concluído'));
+    return res.redirect(302, downloadUrl);
 
   } catch (error) {
-    console.error(`   ❌ /api/stream: ${error.message}`);
-    if (!res.headersSent) res.status(500).send('Falha ao baixar o arquivo de áudio.');
+    console.error(`   ❌ /api/stream POST: ${error.message}`);
+    return res.status(500).send('Falha ao redirecionar para o arquivo de áudio.');
   }
 });
 
@@ -259,7 +238,6 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── Servidor Local (dev) ────────────────────────────────────
-// Em produção (Vercel), o static é servido pelo vercel.json automaticamente.
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(express.static(path.join(__dirname, '..', 'public')));
